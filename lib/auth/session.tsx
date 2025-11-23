@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { apiLogin, apiMe, apiRegisterOwner, apiRegisterVet, setAuthToken } from "../services/api";
+import { apiLogin, apiMe, apiRegisterOwner, apiRegisterVet, setAuthToken, isAxiosError } from "../services/api";
+import type { MeResponse, RegisterOwnerInput, RegisterVetInput } from "../types/api";
 
 type CuentaUI = { correo: string; rol: "dueno" | "veterinario" | "admin" } | null;
 
@@ -9,10 +10,11 @@ type SessionData = { token: string | null; cuenta: CuentaUI };
 
 type SessionCtx = {
   cuenta: CuentaUI;
+  loading: boolean;
   login: (correo: string, contrasena: string) => Promise<CuentaUI>;
   logout: () => void;
-  signupOwner: (args: { dni: string; nombres: string; apellidos: string; correo: string; contrasena: string; telefono: string }) => Promise<void>;
-  signupVet: (args: { dni: string; nombre: string; correo: string; contrasena: string; especialidad: string }) => Promise<void>;
+  signupOwner: (args: RegisterOwnerInput) => Promise<void>;
+  signupVet: (args: RegisterVetInput) => Promise<void>;
 };
 
 const CTX = createContext<SessionCtx | undefined>(undefined);
@@ -20,6 +22,7 @@ const SKEY = "vetchain_session";
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [cuenta, setCuenta] = useState<CuentaUI>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     try {
@@ -28,23 +31,37 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const { token } = JSON.parse(raw) as SessionData;
         if (token) {
           setAuthToken(token);
-          apiMe().then((me) => {
-            const rol = me.cuenta.rol as "dueno" | "veterinario" | "admin";
-            setCuenta({ correo: me.cuenta.correo, rol });
-          }).catch(() => {});
+          apiMe()
+            .then((me) => setCuenta(mapCuenta(me)))
+            .catch(() => {
+              setAuthToken(null);
+              window.localStorage.removeItem(SKEY);
+              setCuenta(null);
+            })
+            .finally(() => setLoading(false));
+          return;
         }
       }
-    } catch {}
+    } catch {
+      // ignore parse errors
+    }
+    setLoading(false);
   }, []);
 
   const login = async (correo: string, contrasena: string) => {
-    const data = await apiLogin(correo, contrasena);
-    setAuthToken(data.token);
-    const me = await apiMe();
-    const info: CuentaUI = { correo: me.cuenta.correo, rol: me.cuenta.rol };
-    setCuenta(info);
-    window.localStorage.setItem(SKEY, JSON.stringify({ token: data.token, cuenta: info } satisfies SessionData));
-    return info;
+    try {
+      const data = await apiLogin(correo, contrasena);
+      setAuthToken(data.token);
+      const me = await apiMe();
+      const info = mapCuenta(me);
+      setCuenta(info);
+      window.localStorage.setItem(SKEY, JSON.stringify({ token: data.token, cuenta: info } satisfies SessionData));
+      return info;
+    } catch (error) {
+      setAuthToken(null);
+      window.localStorage.removeItem(SKEY);
+      throw new Error(readableError(error));
+    }
   };
 
   const logout = () => {
@@ -54,14 +71,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signupOwner: SessionCtx["signupOwner"] = async (args) => {
-    await apiRegisterOwner(args);
+    try {
+      await apiRegisterOwner(args);
+    } catch (error) {
+      throw new Error(readableError(error));
+    }
   };
 
   const signupVet: SessionCtx["signupVet"] = async (args) => {
-    await apiRegisterVet(args);
+    try {
+      await apiRegisterVet(args);
+    } catch (error) {
+      throw new Error(readableError(error));
+    }
   };
 
-  const value = useMemo<SessionCtx>(() => ({ cuenta, login, logout, signupOwner, signupVet }), [cuenta]);
+  const value = useMemo<SessionCtx>(() => ({ cuenta, loading, login, logout, signupOwner, signupVet }), [cuenta, loading]);
 
   return <CTX.Provider value={value}>{children}</CTX.Provider>;
 }
@@ -70,4 +95,16 @@ export function useSession() {
   const ctx = useContext(CTX);
   if (!ctx) throw new Error("useSession must be used within SessionProvider");
   return ctx;
+}
+
+function mapCuenta(me: MeResponse): CuentaUI {
+  return { correo: me.cuenta.correo, rol: me.cuenta.rol };
+}
+
+function readableError(error: unknown): string {
+  if (isAxiosError(error)) {
+    return error.response?.data?.error ?? "Solicitud rechazada por el servidor.";
+  }
+  if (error instanceof Error) return error.message;
+  return "Ocurrio un error inesperado. Intenta nuevamente.";
 }
