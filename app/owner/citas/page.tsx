@@ -27,6 +27,7 @@ type DayGroup = { key: string; label: string; slots: HorarioSlotDTO[]; date: Dat
 
 export default function CitasOwnerPage() {
   const [ownerName, setOwnerName] = useState<string | undefined>();
+  const [ownerAvatar, setOwnerAvatar] = useState<string | null>(null);
   const [mascotas, setMascotas] = useState<MascotaDTO[]>([]);
   const [veterinarios, setVeterinarios] = useState<VeterinarioDTO[]>([]);
   const [centros, setCentros] = useState<CentroDTO[]>([]);
@@ -49,6 +50,7 @@ export default function CitasOwnerPage() {
     Promise.all([apiMe(), apiListPets(), apiListVetsActivos(), apiListCentros(), apiOwnerCitas()])
       .then(([me, pets, vets, centrosResp, citasResp]) => {
         setOwnerName(me.dueno ? `${me.dueno.nombres} ${me.dueno.apellidos}` : me.cuenta.correo);
+        setOwnerAvatar(me.cuenta.avatarURL ?? null);
         setMascotas(pets);
         setVeterinarios(vets);
         setCentros(centrosResp);
@@ -74,6 +76,22 @@ export default function CitasOwnerPage() {
       .catch(() => setFormError("No se pudo consultar la disponibilidad."))
       .finally(() => setSlotsLoading(false));
   }, [vetId, centroId]);
+
+  useEffect(() => {
+    if (!vetId) return;
+    const vet = veterinarios.find((v) => v.id === vetId);
+    if (!vet) return;
+    setCentroId((prev) => {
+      if (vet.centroId) return vet.centroId === prev ? prev : vet.centroId;
+      return prev ? "" : prev;
+    });
+  }, [vetId, veterinarios]);
+
+  const petById = useMemo(() => {
+    const map = new Map<string, MascotaDTO>();
+    mascotas.forEach((m) => map.set(m.id, m));
+    return map;
+  }, [mascotas]);
 
   const slotsDisponibles = useMemo(() => {
     const ahora = Date.now();
@@ -173,7 +191,7 @@ export default function CitasOwnerPage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
-      <OwnerSidebar ownerName={ownerName} active="citas" />
+      <OwnerSidebar ownerName={ownerName} avatarUrl={ownerAvatar} active="citas" />
       <div className="flex-1 space-y-8 px-4 py-8 md:px-10">
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
           <header className="flex flex-col gap-4 border-b border-slate-100 pb-6 md:flex-row md:items-end md:justify-between">
@@ -336,7 +354,7 @@ export default function CitasOwnerPage() {
                       {formatDateTime(cita.fecha)} · {cita.estado}
                     </p>
                     <p className="text-slate-500">
-                      Mascota: {cita.mascota?.nombre ?? "N/D"} — Veterinario: {cita.veterinario?.nombre ?? "N/D"}
+                      Mascota: {resolveMascotaNombre(cita, petById)} — Veterinario: {cita.veterinario?.nombre ?? "N/D"}
                     </p>
                     {cita.motivoCancelacion && (
                       <p className="text-xs text-red-500">Cancelada por: {cita.motivoCancelacion}</p>
@@ -361,6 +379,12 @@ export default function CitasOwnerPage() {
       </div>
     </div>
   );
+}
+
+function resolveMascotaNombre(cita: CitaDTO, map: Map<string, MascotaDTO>) {
+  if (cita.mascota?.nombre) return cita.mascota.nombre;
+  const local = map.get(cita.mascotaId);
+  return local?.nombre ?? "N/D";
 }
 
 function formatDateTime(iso: string) {

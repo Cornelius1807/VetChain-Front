@@ -69,6 +69,11 @@ export async function apiResetPassword(token: string, contrasena: string): Promi
   return data;
 }
 
+export async function apiRequestDeleteAccount(motivo?: string): Promise<{ ok: boolean }> {
+  const { data } = await api.post("/account/delete-request", { motivo });
+  return data;
+}
+
 // --- Catálogos -------------------------------------------------------------
 
 export async function apiListCentros(): Promise<CentroDTO[]> {

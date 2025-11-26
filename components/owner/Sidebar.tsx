@@ -4,10 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import Logo from "../../src/assets/LOGO.png";
 import Dog from "../../src/assets/perro.png";
+import { absoluteUrl } from "../../lib/utils/url";
 
 type Props = {
   ownerName?: string;
   active: "mascotas" | "citas" | "veterinarios";
+  avatarUrl?: string | null;
 };
 
 const links = [
@@ -16,7 +18,8 @@ const links = [
   { href: "/owner/veterinarios", label: "Veterinarios", key: "veterinarios" },
 ];
 
-export default function OwnerSidebar({ ownerName, active }: Props) {
+export default function OwnerSidebar({ ownerName, active, avatarUrl }: Props) {
+  const resolvedAvatar = absoluteUrl(avatarUrl);
   return (
     <aside className="flex w-56 flex-col justify-between border-r border-slate-200 bg-white px-5 py-8 text-slate-900">
       <div className="space-y-5">
@@ -25,7 +28,13 @@ export default function OwnerSidebar({ ownerName, active }: Props) {
           <p className="text-xs uppercase tracking-wide text-slate-500">Bienvenido</p>
           <p className="text-base font-semibold text-slate-900">{ownerName ?? "Usuario"}</p>
         </div>
-        <Image src={Dog} alt="Pet" className="mx-auto h-20 w-20 rounded-full border border-slate-200 object-cover" />
+        <div className="mx-auto h-20 w-20 overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+          {resolvedAvatar ? (
+            <Image src={resolvedAvatar} alt="Foto de perfil" width={80} height={80} className="h-20 w-20 object-cover" unoptimized />
+          ) : (
+            <Image src={Dog} alt="Pet" className="h-20 w-20 object-cover" />
+          )}
+        </div>
         <nav className="space-y-2 text-sm font-medium">
           {links.map((link) => (
             <Link
