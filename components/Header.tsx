@@ -4,12 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "../lib/auth/session";
+import { absoluteUrl } from "../lib/utils/url";
 import Logo from "../src/assets/LOGO.png";
 
 export default function Header() {
   const { cuenta, logout } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const avatarSrc = absoluteUrl(cuenta?.avatarURL);
   const mainLink =
     cuenta?.rol === "dueno" ? "/owner" : cuenta?.rol === "veterinario" ? "/vet" : cuenta?.rol === "admin" ? "/admin" : "/";
 
@@ -62,9 +64,18 @@ export default function Header() {
         <div className="ml-auto flex items-center gap-3 text-sm">
           {cuenta ? (
             <>
-              <span className="text-slate-600">
-                {cuenta.correo} - {cuenta.rol}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-9 w-9 overflow-hidden rounded-full border border-teal-100 bg-white shadow-sm">
+                  {avatarSrc ? (
+                    <Image src={avatarSrc} alt="Avatar" width={36} height={36} className="h-9 w-9 object-cover" unoptimized />
+                  ) : (
+                    <Image src={Logo} alt="VetChain" className="h-7 w-7 object-contain" />
+                  )}
+                </span>
+                <span className="text-slate-600">
+                  {cuenta.correo} - {cuenta.rol}
+                </span>
+              </div>
               <button
                 className="text-teal-700 hover:underline"
                 onClick={() => {

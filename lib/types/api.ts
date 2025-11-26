@@ -6,6 +6,7 @@ export type CuentaDTO = {
   correo: string;
   rol: Rol;
   estado: EstadoCuenta;
+  avatarURL?: string | null;
   creadoEn: string;
   confirmadoEn?: string | null;
 };
@@ -38,6 +39,7 @@ export type VeterinarioDTO = {
   tituloURL?: string | null;
   constanciaURL?: string | null;
   puedeCrearCentro: boolean;
+  avatarURL?: string | null;
   centro?: CentroResumenDTO | null;
 };
 
